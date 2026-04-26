@@ -4,3 +4,5 @@
 # Large files
 *.mp4
 *.pt
+*.pkl
+stubs/

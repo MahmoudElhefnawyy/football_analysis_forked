@@ -34,8 +34,13 @@ class CameraMovementEstimator():
             for frame_num, track in enumerate(object_tracks):
                 for track_id, track_info in track.items():
                     position = track_info['position']
-                    camera_movement = camera_movement_per_frame[frame_num]
-                    position_adjusted = (position[0]-camera_movement[0],position[1]-camera_movement[1])
+                    # Safety check for index bounds:
+                    if frame_num < len(camera_movement_per_frame):
+                        camera_movement = camera_movement_per_frame[frame_num]
+                        position_adjusted = (position[0]-camera_movement[0],position[1]-camera_movement[1])
+                    else:
+                        position_adjusted = position # Fallback to unadjusted
+                    
                     tracks[object][frame_num][track_id]['position_adjusted'] = position_adjusted
                     
 
@@ -44,7 +49,11 @@ class CameraMovementEstimator():
         # Read the stub 
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path,'rb') as f:
-                return pickle.load(f)
+                stub_data = pickle.load(f)
+                # Ensure the stub length matches or is at least reasonably similar
+                if frames is not None and len(stub_data) == len(frames):
+                    return stub_data
+                print(f"Warning: Camera movement stub length ({len(stub_data)}) mismatch. Ignoring stub.")
 
         camera_movement = [[0,0]]*len(frames)
 
@@ -86,7 +95,10 @@ class CameraMovementEstimator():
         """
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, 'rb') as f:
-                return pickle.load(f)
+                stub_data = pickle.load(f)
+                # Since we are streaming from path, we can't easily check 'frames' length here 
+                # but we will handle it via the caller or check video frame count if needed.
+                return stub_data
 
         camera_movement = []
 
