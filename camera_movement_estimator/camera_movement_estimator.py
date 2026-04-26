@@ -78,22 +78,83 @@ class CameraMovementEstimator():
                 pickle.dump(camera_movement,f)
 
         return camera_movement
+
+    def get_camera_movement_from_path(self, video_path, read_from_stub=False, stub_path=None):
+        """Memory-efficient version: streams the video from disk frame-by-frame
+        instead of requiring all frames pre-loaded into a Python list.
+        Falls back to stub cache just like get_camera_movement().
+        """
+        if read_from_stub and stub_path is not None and os.path.exists(stub_path):
+            with open(stub_path, 'rb') as f:
+                return pickle.load(f)
+
+        camera_movement = []
+
+        cap = cv2.VideoCapture(video_path)
+        ret, first_frame = cap.read()
+        if not ret:
+            cap.release()
+            return camera_movement
+
+        old_gray = cv2.cvtColor(first_frame, cv2.COLOR_BGR2GRAY)
+        old_features = cv2.goodFeaturesToTrack(old_gray, **self.features)
+        camera_movement.append([0, 0])  # frame 0 has no movement
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            new_features, _, _ = cv2.calcOpticalFlowPyrLK(
+                old_gray, frame_gray, old_features, None, **self.lk_params
+            )
+
+            max_distance = 0
+            camera_movement_x, camera_movement_y = 0, 0
+
+            for new, old in zip(new_features, old_features):
+                new_pt = new.ravel()
+                old_pt = old.ravel()
+                distance = measure_distance(new_pt, old_pt)
+                if distance > max_distance:
+                    max_distance = distance
+                    camera_movement_x, camera_movement_y = measure_xy_distance(old_pt, new_pt)
+
+            if max_distance > self.minimum_distance:
+                camera_movement.append([camera_movement_x, camera_movement_y])
+                old_features = cv2.goodFeaturesToTrack(frame_gray, **self.features)
+            else:
+                camera_movement.append([0, 0])
+
+            old_gray = frame_gray.copy()
+
+        cap.release()
+
+        if stub_path is not None:
+            with open(stub_path, 'wb') as f:
+                pickle.dump(camera_movement, f)
+
+        return camera_movement
     
     def draw_camera_movement(self,frames, camera_movement_per_frame):
         output_frames=[]
 
         for frame_num, frame in enumerate(frames):
             frame= frame.copy()
-
-            overlay = frame.copy()
-            cv2.rectangle(overlay,(0,0),(500,100),(255,255,255),-1)
-            alpha =0.6
-            cv2.addWeighted(overlay,alpha,frame,1-alpha,0,frame)
-
-            x_movement, y_movement = camera_movement_per_frame[frame_num]
-            frame = cv2.putText(frame,f"Camera Movement X: {x_movement:.2f}",(10,30), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),3)
-            frame = cv2.putText(frame,f"Camera Movement Y: {y_movement:.2f}",(10,60), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),3)
-
+            frame = self.draw_camera_movement_frame(frame, camera_movement_per_frame[frame_num])
             output_frames.append(frame) 
 
         return output_frames
+
+    def draw_camera_movement_frame(self, frame, movement):
+        """Draw camera movement overlay on a single frame."""
+        overlay = frame.copy()
+        cv2.rectangle(overlay,(0,0),(500,100),(255,255,255),-1)
+        alpha =0.6
+        cv2.addWeighted(overlay,alpha,frame,1-alpha,0,frame)
+
+        x_movement, y_movement = movement
+        frame = cv2.putText(frame,f"Camera Movement X: {x_movement:.2f}",(10,30), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),3)
+        frame = cv2.putText(frame,f"Camera Movement Y: {y_movement:.2f}",(10,60), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),3)
+        return frame

@@ -1,2 +1,6 @@
 *__pycahce__*
 *.pyc
+
+# Large files
+*.mp4
+*.pt
