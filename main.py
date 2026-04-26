@@ -1,5 +1,5 @@
 from utils import save_video
-from trackers import Tracker
+from trackers import ReIDTracker
 import cv2
 import numpy as np
 from team_assigner import TeamAssigner
@@ -23,7 +23,7 @@ def main():
     # model.track() streams the video internally through BoT-SORT — no frames
     # are loaded into RAM.  A stub is saved so subsequent runs skip this step.
     # =========================================================================
-    tracker = Tracker('models/best.pt')
+    tracker = ReIDTracker('models/best.pt', reid_model_name='osnet_x0_25')
 
     tracks = tracker.get_object_tracks(
         VIDEO_PATH,                        # pass path, NOT pre-loaded frames
