@@ -6,7 +6,7 @@ import cv2
 import torch
 import supervision as sv
 from ultralytics import YOLO
-import lapx
+import lap
 
 # Torchreid imports
 # Note: torchreid needs to be installed, usually via:
@@ -145,7 +145,7 @@ class ReIDTracker:
         
         if num_dets > 0 and num_cands > 0:
             # lap.lapjv minimizes the cost matrix
-            cost, x, y = lapx.lapjv(cost_matrix, extend_cost=True, cost_limit=1.0)
+            cost, x, y = lap.lapjv(cost_matrix, extend_cost=True, cost_limit=1.0)
             
             for d, c in enumerate(x):
                 if c >= 0 and cost_matrix[d, c] < 1.0:
